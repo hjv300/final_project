@@ -9,4 +9,4 @@ conda activate <env>
 python3 experiment1b_finetuning.py
 python3 experiment2_finetuning.py
 ```
-Here is the link for the individual work done by me: 
+Here is the link for the individual work done by me: https://github.com/hjv300/final_project
