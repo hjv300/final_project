@@ -93,7 +93,7 @@ def evaluate(model, dataloader, tokenizer, device):
     return total_correct_sequences / total_sequences
 
 # 3. Automate Training Across Data Percentages
-def run_experiments(data_path, percentages, epochs=10, batch_size=16):
+def run_experiments(data_path, percentages, epochs=10, batch_size=4):
     tokenizer = T5Tokenizer.from_pretrained('t5-small')
     full_dataset = T5Dataset(data_path, tokenizer)
 
@@ -124,7 +124,7 @@ def run_experiments(data_path, percentages, epochs=10, batch_size=16):
     return results
 
 # 4. Run the Experiments
-percentages = [0.01, 0.02, 0.04, 0.08, 0.16, 0.32, 0.64, 1.0]
+percentages = [1] #[0.32, 0.64, 1.0]#[0.01, 0.02, 0.04, 0.08, 0.16,]
 results = run_experiments('../data/simple_split/tasks_train_simple.txt', percentages)
 
 # 5. Display Results

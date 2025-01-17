@@ -5,7 +5,7 @@ from transformers import T5Tokenizer, T5ForConditionalGeneration, AdamW
 import matplotlib.pyplot as plt
 from tqdm import tqdm
 from collections import defaultdict
-
+from experiment1b_finetuning import train
 # Dataset Loader for Experiment 2
 class T5DatasetExp2(Dataset):
     def __init__(
@@ -21,12 +21,6 @@ class T5DatasetExp2(Dataset):
         min_action_length=None,
         max_action_length=None,
     ):
-        """
-        :param min_command_length: if set, filter out samples with command length < this
-        :param max_command_length: if set, filter out samples with command length > this
-        :param min_action_length:  if set, filter out samples with action length < this
-        :param max_action_length:  if set, filter out samples with action length > this
-        """
         self.tokenizer = tokenizer
         self.max_len = max_len
         self.train_threshold = train_threshold
@@ -47,20 +41,16 @@ class T5DatasetExp2(Dataset):
                 in_text = line.split('IN:')[1].split('OUT:')[0].strip()
                 out_text = line.split('OUT:')[1].strip()
 
-                # Compute lengths
                 command_length = len(in_text.split())
                 action_length = len(out_text.split())
 
-                # Basic train/test filtering
                 if self.mode == 'train' and action_length <= self.train_threshold:
                     pass
                 elif self.mode == 'test' and action_length >= self.test_min_length:
                     pass
                 else:
-                    # Skip if it doesn't meet the basic train/test condition
                     continue
 
-                # Additional command/action length filtering
                 if (self.min_command_length is not None and command_length < self.min_command_length):
                     continue
                 if (self.max_command_length is not None and command_length > self.max_command_length):
@@ -70,7 +60,6 @@ class T5DatasetExp2(Dataset):
                 if (self.max_action_length is not None and action_length > self.max_action_length):
                     continue
 
-                # If it passes all filters, include it
                 self.data.append((in_text, out_text))
 
         print(f"{self.mode.capitalize()} set: {len(self.data)} samples loaded "
@@ -105,19 +94,18 @@ class T5DatasetExp2(Dataset):
             'labels': output_encoding['input_ids'].squeeze(),
         }
 
-# Plotting function
+
 def plot_acc(sequence_lengths, accuracies, xlabel, ylabel, title, file_name):
     plt.figure(figsize=(8, 6))
     plt.bar(sequence_lengths, accuracies, color='skyblue', edgecolor='black')
     plt.xlabel(xlabel)
     plt.ylabel(ylabel)
     plt.title(title)
-    plt.ylim(0, 1)  # Ensure accuracy values are between 0 and 1
+    plt.ylim(0, 1)  
     plt.grid(axis='y', linestyle='--', alpha=0.7)
     plt.savefig(file_name, dpi=300, bbox_inches='tight')
     plt.close()
 
-# Corrected Evaluation Function
 def evaluate(model, dataloader, tokenizer, device, top_k=1):
     print(f"Evaluate!! Sampling from top {top_k}")
     model.eval()
@@ -140,13 +128,11 @@ def evaluate(model, dataloader, tokenizer, device, top_k=1):
                 top_k=top_k
             )
 
-            # Token-level accuracy (ignore padding)
             correct_tokens = (outputs == labels)
             non_pad_mask = (labels != tokenizer.pad_token_id)
             total_correct_tokens += (correct_tokens & non_pad_mask).sum().item()
             total_tokens += non_pad_mask.sum().item()
 
-            # Sequence-level accuracy
             correct_sequences = (outputs == labels).all(dim=1)
             total_correct_sequences += correct_sequences.sum().item()
             total_sequences += labels.size(0)
@@ -158,27 +144,24 @@ def evaluate(model, dataloader, tokenizer, device, top_k=1):
     print(f"Sequence-Level Accuracy: {sequence_acc:.4f}")
     return token_acc, sequence_acc
 
-# Main function with plotting
 def main():
     device = 'cuda' if torch.cuda.is_available() else 'cpu'
     print('device:', device)
 
     path_test = '../data/length_split/tasks_test_length.txt'
+    path_train = '../data/length_split/tasks_train_length.txt'
     tokenizer = T5Tokenizer.from_pretrained('t5-small')
     model = T5ForConditionalGeneration.from_pretrained('t5-small').to(device)
-    model.load_state_dict(torch.load('t5_experiment2_model.pth'))
+    #model.load_state_dict(torch.load('t5_experiment2_model.pth'))
+    model = train(model, path_train, tokenizer, device, epochs=10, batch_size=16)
+    batch_size = 4
 
-    # You might adjust these if you need a higher or lower batch size
-    batch_size = 32
-
-    # Example: Evaluate by command lengths 4, 6, 7, 8, 9
     command_sequence_length = [4, 6, 7, 8, 9]
     token_acc_command_statistics = defaultdict(list)
     seq_acc_command_statistics = defaultdict(list)
 
     for length in command_sequence_length:
-        # We use min_command_length=length, max_command_length=length
-        # so we only get the samples with *exactly* that command length.
+
         test_dataset = T5DatasetExp2(
             data_path=path_test,
             tokenizer=tokenizer,
@@ -211,14 +194,11 @@ def main():
         "seq_acc_command.png"
     )
 
-    # Example: Evaluate by action lengths 24, 25, 26, ...
     action_sequence_length = [24, 25, 26, 27, 28, 30, 32, 33, 36, 40, 48]
     token_acc_action_statistics = defaultdict(list)
     seq_acc_action_statistics = defaultdict(list)
 
     for length in action_sequence_length:
-        # We use min_action_length=length, max_action_length=length
-        # so we only get samples with *exactly* that action length.
         test_dataset = T5DatasetExp2(
             data_path=path_test,
             tokenizer=tokenizer,
